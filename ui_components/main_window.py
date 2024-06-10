@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
-                             QPushButton, QLineEdit, QMessageBox, QInputDialog, QLabel, QComboBox)
+                             QPushButton, QLineEdit, QMessageBox, QInputDialog, QLabel, QComboBox, QDialog, QDateTimeEdit, QTextEdit)
 from PyQt5.QtGui import QFont, QPalette, QBrush, QColor
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDateTime
 from models.task_manager import TaskManager
 from resources.styles import Styles
 
@@ -62,21 +62,13 @@ class ToDoApp(QWidget):
         self.tasks.itemDoubleClicked.connect(self.toggle_task_completion)
         self.layout.addWidget(self.tasks)
 
-        # Поле ввода новой задачи
-        self.task_input = QLineEdit(self)
-        self.task_input.setPlaceholderText("Введите задачу...")
-        self.task_input.setFont(QFont('Arial', 14))
-        self.task_input.setStyleSheet(Styles.task_input)
-        self.task_input.returnPressed.connect(self.add_task)
-        self.layout.addWidget(self.task_input)
-
         # Лэйаут для кнопок
         self.buttons_layout = QHBoxLayout()
 
         # Кнопка добавления задачи
         self.add_button = QPushButton('Добавить задачу')
         self.add_button.setStyleSheet(Styles.add_button)
-        self.add_button.clicked.connect(self.add_task)
+        self.add_button.clicked.connect(self.show_add_task_dialog)
         self.buttons_layout.addWidget(self.add_button)
 
         # Кнопка редактирования задачи
@@ -110,19 +102,17 @@ class ToDoApp(QWidget):
         for task in self.task_manager.get_tasks(current_section):
             self.tasks.addItem(task)
 
-    def add_task(self):
+    def show_add_task_dialog(self):
         """
-        Добавляет новую задачу в текущий раздел.
+        Показывает диалоговое окно для добавления новой задачи.
         """
-        task = self.task_input.text()
-        if task:
+        dialog = AddTaskDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            title, description, deadline = dialog.get_task_data()
             section = self.section_selector.currentText()
-            self.task_manager.add_task(section, task)
-            self.tasks.addItem(task)
-            self.task_input.clear()
+            self.task_manager.add_task(section, f"{title} (до {deadline.toString()})\n{description}")
+            self.filter_tasks()
             self.task_manager.save_tasks()
-        else:
-            QMessageBox.warning(self, 'Внимание', 'Задача не может быть пустой!')
 
     def add_section(self):
         """
@@ -179,3 +169,44 @@ class ToDoApp(QWidget):
         else:
             item.setCheckState(Qt.Checked)
         self.task_manager.save_tasks()
+
+class AddTaskDialog(QDialog):
+    def __init__(self, parent=None):
+        """
+        Инициализирует диалоговое окно для добавления новой задачи.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Добавить задачу")
+        self.setGeometry(100, 100, 400, 300)
+        self.layout = QVBoxLayout()
+
+        self.title_input = QLineEdit(self)
+        self.title_input.setPlaceholderText("Название задачи")
+        self.layout.addWidget(self.title_input)
+
+        self.description_input = QTextEdit(self)
+        self.description_input.setPlaceholderText("Описание")
+        self.layout.addWidget(self.description_input)
+
+        self.deadline_input = QDateTimeEdit(self)
+        self.deadline_input.setDateTime(QDateTime.currentDateTime())
+        self.deadline_input.setCalendarPopup(True)
+        self.layout.addWidget(self.deadline_input)
+
+        self.buttons_layout = QHBoxLayout()
+        self.add_button = QPushButton("Добавить")
+        self.add_button.clicked.connect(self.accept)
+        self.buttons_layout.addWidget(self.add_button)
+
+        self.cancel_button = QPushButton("Отмена")
+        self.cancel_button.clicked.connect(self.reject)
+        self.buttons_layout.addWidget(self.cancel_button)
+
+        self.layout.addLayout(self.buttons_layout)
+        self.setLayout(self.layout)
+
+    def get_task_data(self):
+        """
+        Возвращает данные задачи из диалогового окна.
+        """
+        return self.title_input.text(), self.description_input.toPlainText(), self.deadline_input.dateTime()
