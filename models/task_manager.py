@@ -62,6 +62,13 @@ class TaskManager:
             return True
         return False
 
+    def delete_section(self, section):
+        """
+        Удаляет указанный раздел.
+        """
+        if section in self.tasks_dict:
+            del self.tasks_dict[section]
+
     def edit_task(self, section, old_task, new_task):
         """
         Редактирует задачу в заданном разделе.

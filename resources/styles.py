@@ -24,6 +24,8 @@ class Styles:
             padding: 10px;
             border: 1px solid #ccc;
             margin-bottom: 5px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
         }
         QListWidget::item:selected {
             background-color: #B0E57C;
@@ -78,5 +80,16 @@ class Styles:
         }
         QPushButton:hover {
             background-color: #da190b;
+        }
+    """
+
+    combo_box = """
+        QComboBox {
+            border: 1px solid #ccc;
+            padding: 5px;
+            font-size: 14px;
+        }
+        QComboBox::drop-down {
+            border-left: 1px solid #ccc;
         }
     """

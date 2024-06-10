@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
                              QPushButton, QLineEdit, QMessageBox, QInputDialog, QLabel, QComboBox, QDialog, QDateTimeEdit, QTextEdit)
-from PyQt5.QtGui import QFont, QPalette, QBrush, QColor
+from PyQt5.QtGui import QFont, QPalette, QColor
 from PyQt5.QtCore import Qt, QDateTime
 from models.task_manager import TaskManager
 from resources.styles import Styles
@@ -24,14 +24,14 @@ class ToDoApp(QWidget):
 
         # Установка фонового цвета и настройка элементов интерфейса
         palette = QPalette()
-        palette.setBrush(QPalette.Background, QBrush(QColor("#D0E3CC")))
+        palette.setColor(QPalette.Background, QColor("#f0f0f0"))
         self.setPalette(palette)
 
         self.layout = QVBoxLayout()  # Основной вертикальный лэйаут
 
         # Заголовок
         self.header = QLabel('To-do List')
-        self.header.setFont(QFont('Arial', 20))
+        self.header.setFont(QFont('Arial', 20, QFont.Bold))
         self.header.setAlignment(Qt.AlignCenter)
         self.layout.addWidget(self.header)
 
@@ -45,6 +45,7 @@ class ToDoApp(QWidget):
         self.section_selector = QComboBox()
         self.section_selector.addItems(self.task_manager.get_sections())
         self.section_selector.setFont(QFont('Arial', 14))
+        self.section_selector.setStyleSheet(Styles.combo_box)
         self.section_selector.currentTextChanged.connect(self.filter_tasks)
         self.section_layout.addWidget(self.section_selector)
 
@@ -56,10 +57,16 @@ class ToDoApp(QWidget):
         self.add_section_button.clicked.connect(self.add_section)
         self.layout.addWidget(self.add_section_button)
 
+        # Кнопка удаления раздела
+        self.delete_section_button = QPushButton('Удалить раздел')
+        self.delete_section_button.setStyleSheet(Styles.delete_button)
+        self.delete_section_button.clicked.connect(self.delete_section)
+        self.layout.addWidget(self.delete_section_button)
+
         # Список задач
         self.tasks = QListWidget()
         self.tasks.setStyleSheet(Styles.tasks_list)
-        self.tasks.itemDoubleClicked.connect(self.toggle_task_completion)
+        self.tasks.itemChanged.connect(self.toggle_task_completion)
         self.layout.addWidget(self.tasks)
 
         # Лэйаут для кнопок
@@ -100,7 +107,10 @@ class ToDoApp(QWidget):
         self.tasks.clear()
         current_section = self.section_selector.currentText()
         for task in self.task_manager.get_tasks(current_section):
-            self.tasks.addItem(task)
+            item = QListWidgetItem(task)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            self.tasks.addItem(item)
 
     def show_add_task_dialog(self):
         """
@@ -109,8 +119,10 @@ class ToDoApp(QWidget):
         dialog = AddTaskDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             title, description, deadline = dialog.get_task_data()
+            deadline_str = deadline.toString("dd.MM.yyyy HH:mm")
             section = self.section_selector.currentText()
-            self.task_manager.add_task(section, f"{title} (до {deadline.toString()})\n{description}")
+            task = f"{title} (до {deadline_str})\n{description}"
+            self.task_manager.add_task(section, task)
             self.filter_tasks()
             self.task_manager.save_tasks()
 
@@ -125,6 +137,20 @@ class ToDoApp(QWidget):
                 self.task_manager.save_tasks()
             else:
                 QMessageBox.warning(self, 'Внимание', 'Раздел уже существует!')
+
+    def delete_section(self):
+        """
+        Удаляет выбранный раздел.
+        """
+        current_section = self.section_selector.currentText()
+        reply = QMessageBox.question(self, 'Подтверждение удаления', 
+                                     f'Вы уверены, что хотите удалить раздел "{current_section}"?', 
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.task_manager.delete_section(current_section)
+            self.section_selector.removeItem(self.section_selector.currentIndex())
+            self.task_manager.save_tasks()
+            self.filter_tasks()
 
     def edit_task(self):
         """
@@ -162,12 +188,19 @@ class ToDoApp(QWidget):
 
     def toggle_task_completion(self, item):
         """
-        Переключает состояние выполнения задачи (завершена/незавершена).
+        Переключает состояние выполнения задачи (завершена/незавершена) и удаляет выполненные задачи.
         """
         if item.checkState() == Qt.Checked:
-            item.setCheckState(Qt.Unchecked)
-        else:
-            item.setCheckState(Qt.Checked)
+            self.remove_task(item)
+
+    def remove_task(self, item):
+        """
+        Удаляет задачу.
+        """
+        section = self.section_selector.currentText()
+        task = item.text()
+        self.task_manager.delete_task(section, task)
+        self.tasks.takeItem(self.tasks.row(item))
         self.task_manager.save_tasks()
 
 class AddTaskDialog(QDialog):
